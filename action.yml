@@ -1,0 +1,105 @@
+name: 'Airut Sandbox'
+description: >-
+  Run CI commands inside a sandboxed container with network restrictions
+  and credential isolation. Loads sandbox configuration from the trusted
+  base branch; PR code runs only inside the container.
+
+inputs:
+  command:
+    description: 'CI command to run inside the sandbox (after PR checkout)'
+    required: true
+  pr_sha:
+    description: 'PR commit SHA to check out and test'
+    required: true
+  merge:
+    description: >-
+      Merge PR into base branch before running (like GitHub default).
+      Set to "false" to check out the PR commit directly.
+    required: false
+    default: 'true'
+  airut_version:
+    description: >-
+      Airut version to install. PyPI version (e.g., "0.15.0") or "main"
+      for latest from GitHub. Empty = use version bundled with action.
+    required: false
+    default: ''
+  sandbox_args:
+    description: 'Additional arguments for airut-sandbox run'
+    required: false
+    default: '--verbose'
+
+runs:
+  using: "composite"
+  steps:
+    # --- Host-side setup (trusted) ---
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Install Python
+      shell: bash
+      run: uv python install 3.13
+
+    - name: Install airut-sandbox
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.airut_version }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        VERSION="$INPUT_VERSION"
+        if [ -z "$VERSION" ]; then
+          VERSION=$(cat "$ACTION_PATH/VERSION")
+        fi
+        if [ "$VERSION" = "main" ]; then
+          uv tool install \
+            "airut @ git+https://github.com/airutorg/airut@main"
+        else
+          uv tool install "airut==$VERSION"
+        fi
+
+    # --- Base-branch checkout (trusted config) ---
+    # Uses base.ref for PRs, ref_name for push events.
+    # Security: the workflow MUST trigger only on PRs targeting protected
+    # branches. See README for required security controls.
+
+    - name: Checkout trusted base branch
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
+        fetch-depth: 0
+
+    # --- Fetch PR SHA on host ---
+    # Objects are stored in .git/ which is mounted into the container.
+    # This avoids needing GitHub credentials inside the sandbox.
+
+    - name: Fetch PR commit
+      shell: bash
+      env:
+        TARGET_SHA: ${{ inputs.pr_sha }}
+      run: git fetch origin "$TARGET_SHA"
+
+    # --- Run sandboxed command ---
+    # The checkout/merge + command is passed inline. No files are written
+    # to the workspace -- it must remain clean for worktree-clean checks.
+    #
+    # SECURITY: This must be the LAST step. After sandbox execution the
+    # workspace is tainted (untrusted code had write access to .git/ and
+    # all files). No host-side steps may run after this point.
+
+    - name: Run sandboxed command
+      shell: bash
+      env:
+        SANDBOX_PR_SHA: ${{ inputs.pr_sha }}
+        SANDBOX_COMMAND: ${{ inputs.command }}
+        SANDBOX_ARGS: ${{ inputs.sandbox_args }}
+        SANDBOX_MERGE: ${{ inputs.merge }}
+      run: |
+        if [ "$SANDBOX_MERGE" = "true" ]; then
+          GIT_CMD='git merge --no-edit "$1"'
+        else
+          GIT_CMD='git checkout "$1"'
+        fi
+        # shellcheck disable=SC2086
+        airut-sandbox run $SANDBOX_ARGS -- \
+          bash -c "$GIT_CMD"' && eval "$2"' \
+          _ "$SANDBOX_PR_SHA" "$SANDBOX_COMMAND"
