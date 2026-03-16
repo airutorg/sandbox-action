@@ -27,6 +27,13 @@ inputs:
     description: 'Additional arguments for airut-sandbox run'
     required: false
     default: '--verbose'
+  network_log_live:
+    description: >-
+      Print network activity to the job log during execution.
+      Useful for diagnosing network sandbox issues. Each line is
+      prefixed with [net] on stderr.
+    required: false
+    default: 'false'
 
 runs:
   using: "composite"
@@ -93,13 +100,18 @@ runs:
         SANDBOX_COMMAND: ${{ inputs.command }}
         SANDBOX_ARGS: ${{ inputs.sandbox_args }}
         SANDBOX_MERGE: ${{ inputs.merge }}
+        SANDBOX_NETWORK_LOG_LIVE: ${{ inputs.network_log_live }}
       run: |
         if [ "$SANDBOX_MERGE" = "true" ]; then
           GIT_CMD='git merge --no-edit "$1"'
         else
           GIT_CMD='git checkout "$1"'
         fi
+        EXTRA_ARGS=""
+        if [ "$SANDBOX_NETWORK_LOG_LIVE" = "true" ]; then
+          EXTRA_ARGS="--network-log-live"
+        fi
         # shellcheck disable=SC2086
-        airut-sandbox run $SANDBOX_ARGS -- \
+        airut-sandbox run $SANDBOX_ARGS $EXTRA_ARGS -- \
           bash -c "$GIT_CMD"' && eval "$2"' \
           _ "$SANDBOX_PR_SHA" "$SANDBOX_COMMAND"

@@ -71,13 +71,14 @@ The PR code runs **only inside the container**. Sandbox configuration
 
 ## Inputs
 
-| Input           | Required | Default        | Description                                                                |
-| --------------- | -------- | -------------- | -------------------------------------------------------------------------- |
-| `command`       | Yes      |                | CI command to run inside the sandbox (after PR checkout)                   |
-| `pr_sha`        | Yes      |                | PR commit SHA to check out and test                                        |
-| `merge`         | No       | `true`         | Merge PR into base branch before running (like GitHub's default behavior) |
-| `airut_version` | No       | from `VERSION` | Airut version (`0.15.0` for PyPI, `main` for GitHub HEAD)                 |
-| `sandbox_args`  | No       | `--verbose`    | Additional arguments for `airut-sandbox run`                               |
+| Input              | Required | Default        | Description                                                                |
+| ------------------ | -------- | -------------- | -------------------------------------------------------------------------- |
+| `command`          | Yes      |                | CI command to run inside the sandbox (after PR checkout)                   |
+| `pr_sha`           | Yes      |                | PR commit SHA to check out and test                                        |
+| `merge`            | No       | `true`         | Merge PR into base branch before running (like GitHub's default behavior) |
+| `airut_version`    | No       | from `VERSION` | Airut version (`0.15.0` for PyPI, `main` for GitHub HEAD)                 |
+| `sandbox_args`     | No       | `--verbose`    | Additional arguments for `airut-sandbox run`                               |
+| `network_log_live` | No       | `false`        | Print network activity to the job log (useful for diagnosing sandbox issues) |
 
 When `merge` is `true` (the default), the container starts on the base branch
 and runs `git merge --no-edit <sha>` to create a temporary merge commit. This
