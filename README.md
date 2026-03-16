@@ -101,6 +101,104 @@ Your repository needs:
 The network allowlist does **not** need to include your repository's GitHub URL.
 The action fetches the PR SHA on the host before entering the sandbox.
 
+## Configuration
+
+### Sandbox Config (`.airut/sandbox.yaml`)
+
+This file controls what the container receives. It lives on the default branch
+and is reviewed by humans before taking effect.
+
+```yaml
+# .airut/sandbox.yaml
+
+# Environment variables (non-sensitive only)
+env:
+  CI: "true"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+# Network sandbox (enabled by default)
+network_sandbox: true
+
+# Masked secrets — container gets surrogates, proxy swaps for real values
+# only on matching hosts. Prevents credential exfiltration.
+masked_secrets:
+  GH_TOKEN:
+    value: !env GH_TOKEN
+    scopes: ["api.github.com", "*.githubusercontent.com"]
+    headers: ["Authorization"]
+
+# Resource limits
+resource_limits:
+  memory: "4g"
+  cpus: 2
+  timeout: 600
+```
+
+Pass secrets from GitHub Actions via `env:` on the action step:
+
+```yaml
+- uses: airutorg/sandbox-action@v0
+  with:
+    command: 'uv sync && uv run pytest'
+    pr_sha: ${{ github.event.pull_request.head.sha }}
+  env:
+    GH_TOKEN: ${{ secrets.GH_TOKEN }}
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+The `!env` tags in `sandbox.yaml` resolve from the runner's environment
+variables (set by the workflow `env:` block). If a referenced variable is
+missing, `airut-sandbox` exits with code 125 (fail-closed).
+
+### Credential Handling
+
+Credentials should use the most restrictive mechanism available:
+
+| Mechanism               | When to use                             | Protection                                 |
+| ----------------------- | --------------------------------------- | ------------------------------------------ |
+| **Signing credentials** | AWS services (SigV4/SigV4A)             | Strongest: real keys never enter container |
+| **Masked secrets**      | All other API tokens, passwords         | Strong: container sees only surrogates     |
+| **`pass_env`**          | Non-sensitive values (CI flags, locale) | None: real value visible inside container  |
+
+**Masked secrets should be the default for all credentials.** Even if the
+network sandbox prevents most exfiltration, masked secrets ensure that a
+container escape or sandbox misconfiguration cannot expose real credentials.
+
+### Network Allowlist
+
+If `network_sandbox: true` (the default), the container's outbound HTTP(S)
+traffic is restricted to `.airut/network-allowlist.yaml`. The allowlist does
+**not** need to include the repository's own GitHub URL -- the action fetches
+the PR SHA on the host before entering the sandbox.
+
+See the Airut
+[network sandbox documentation](https://github.com/airutorg/airut/blob/main/doc/network-sandbox.md)
+for the allowlist format and examples.
+
+## Full Workflow Example
+
+```yaml
+name: CI
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: airutorg/sandbox-action@v0
+        with:
+          command: |
+            uv sync
+            uv run scripts/ci.py --verbose --timeout 0
+          pr_sha: ${{ github.event.pull_request.head.sha || github.sha }}
+          sandbox_args: '--verbose'
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
 ## Runner Requirements
 
 - **Container runtime**: podman (included on GitHub-hosted `ubuntu-latest`) or
@@ -129,6 +227,11 @@ This requires two external controls that the action cannot enforce itself:
 The action is fail-secure: if any setup step fails (installation error, missing
 container runtime, fetch failure), the workflow exits non-zero. There is no
 fallback to unsandboxed execution.
+
+For the full trust model, detailed security requirements (PAT scope
+configuration, branch protection setup, push rulesets), and residual risk
+analysis, see the Airut
+[CI sandbox security guide](https://github.com/airutorg/airut/blob/main/doc/ci-sandbox.md).
 
 ### Tainted Workspace
 
