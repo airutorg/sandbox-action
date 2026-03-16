@@ -110,16 +110,6 @@ runs:
         echo "repo=$repo" >> "$GITHUB_OUTPUT"
         echo "proxy=$proxy" >> "$GITHUB_OUTPUT"
 
-    - name: Fetch Claude Code version
-      id: cc-version
-      if: inputs.cache == 'true'
-      shell: bash
-      run: |
-        CC_VERSION=$(curl -fsSL --max-time 5 \
-          "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/latest" \
-          2>/dev/null || echo "unknown")
-        echo "version=$CC_VERSION" >> "$GITHUB_OUTPUT"
-
     - name: Restore repo image cache
       id: repo-cache
       if: inputs.cache == 'true'
@@ -127,7 +117,7 @@ runs:
       with:
         path: /tmp/airut-image-cache/repo.tar
         key: >-
-          airut-repo-${{ steps.image-hash.outputs.repo }}-cc${{ steps.cc-version.outputs.version }}${{ inputs.cache-version && format('-v{0}', inputs.cache-version) || '' }}
+          airut-repo-${{ steps.image-hash.outputs.repo }}${{ inputs.cache-version && format('-v{0}', inputs.cache-version) || '' }}
 
     - name: Restore proxy image cache
       id: proxy-cache
@@ -162,7 +152,7 @@ runs:
       with:
         path: /tmp/airut-image-cache/repo.tar
         key: >-
-          airut-repo-${{ steps.image-hash.outputs.repo }}-cc${{ steps.cc-version.outputs.version }}${{ inputs.cache-version && format('-v{0}', inputs.cache-version) || '' }}
+          airut-repo-${{ steps.image-hash.outputs.repo }}${{ inputs.cache-version && format('-v{0}', inputs.cache-version) || '' }}
 
     - name: Upload proxy image cache
       if: >-

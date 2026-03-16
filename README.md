@@ -253,7 +253,7 @@ saving ~50 s per CI run.
 Two images are cached independently:
 
 - **Repo image**: Your tools and dependencies. Cache key includes the Dockerfile
-  content hash and the current Claude Code version.
+  content hash.
 - **Proxy image**: The network sandbox proxy. Cache key includes a hash of the
   proxy package files.
 
