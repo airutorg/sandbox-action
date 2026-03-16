@@ -61,7 +61,8 @@ jobs:
 1. Installs `uv`, Python, and `airut-sandbox` on the host
 2. Checks out the **base branch** (trusted sandbox configuration)
 3. Fetches the PR commit on the host (no GitHub credentials needed in sandbox)
-4. Runs your command inside `airut-sandbox`: container isolation, network
+4. Restores cached container images (or builds and caches them on first run)
+5. Runs your command inside `airut-sandbox`: container isolation, network
    allowlisting, and **masked credentials** (surrogate tokens that the proxy
    replaces with real values only on matching outbound requests)
 
@@ -78,6 +79,9 @@ The PR code runs **only inside the container**. Sandbox configuration
 | `merge`         | No       | `true`         | Merge PR into base branch before running (like GitHub's default behavior) |
 | `airut_version` | No       | from `VERSION` | Airut version (`0.15.0` for PyPI, `main` for GitHub HEAD)                 |
 | `sandbox_args`  | No       | `--verbose`    | Additional arguments for `airut-sandbox run`                               |
+| `cache`         | No       | `true`         | Enable image caching across CI runs                                        |
+| `cache-version` | No       | `""`           | Arbitrary string to force cache invalidation                               |
+| `cache-max-age` | No       | `168`          | Maximum image age (hours) before forced rebuild                            |
 
 When `merge` is `true` (the default), the container starts on the base branch
 and runs `git merge --no-edit <sha>` to create a temporary merge commit. This
@@ -136,6 +140,44 @@ runs git commands risks executing attacker-controlled code outside the sandbox.
 
 If post-sandbox operations are needed (e.g., uploading test artifacts), they
 must run in a separate job that does not share the tainted workspace.
+
+## Image Caching
+
+By default, the action caches built container images across CI runs using
+`actions/cache`. This eliminates redundant image builds on ephemeral runners,
+saving ~50 s per CI run.
+
+Two images are cached independently:
+
+- **Repo image**: Your tools and dependencies. Cache key includes the Dockerfile
+  content hash and the current Claude Code version.
+- **Proxy image**: The network sandbox proxy. Cache key includes a hash of the
+  proxy package files.
+
+All cache operations run **before** the sandbox executes untrusted code. No
+steps run after the sandbox. Cache keys are content-addressed, so cached images
+are always consistent with the current configuration.
+
+To disable caching (e.g., for debugging image builds):
+
+```yaml
+- uses: airutorg/sandbox-action@v0
+  with:
+    command: 'uv sync && uv run pytest'
+    pr_sha: ${{ github.event.pull_request.head.sha }}
+    cache: 'false'
+```
+
+To force cache invalidation (e.g., after urgent security patches), bump
+`cache-version`:
+
+```yaml
+- uses: airutorg/sandbox-action@v0
+  with:
+    command: 'uv sync && uv run pytest'
+    pr_sha: ${{ github.event.pull_request.head.sha }}
+    cache-version: '2'
+```
 
 ## Versioning
 
