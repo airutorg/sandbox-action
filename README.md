@@ -179,6 +179,53 @@ To force cache invalidation (e.g., after urgent security patches), bump
     cache-version: '2'
 ```
 
+## Debugging Network Issues
+
+When a sandboxed CI command fails due to blocked network requests, use the
+`sandbox_args` input to enable live network logging. This streams every
+DNS query, allowed request, and blocked request to the job log in real time:
+
+```yaml
+- uses: airutorg/sandbox-action@v0
+  with:
+    command: 'uv sync && uv run pytest'
+    pr_sha: ${{ github.event.pull_request.head.sha }}
+    sandbox_args: '--verbose --network-log-live'
+```
+
+The `--network-log-live` flag prints each network event to stderr as it
+happens, prefixed with `[net]`:
+
+```
+[net] DNS A pypi.org -> 10.199.1.100
+[net] allowed GET https://pypi.org/simple/requests/ -> 200
+[net] BLOCKED GET https://evil.com/exfiltrate -> 403
+```
+
+You can also save the full network log to a file for later inspection (e.g., as
+a CI artifact) by adding `--network-log`:
+
+```yaml
+- uses: airutorg/sandbox-action@v0
+  with:
+    command: 'uv sync && uv run pytest'
+    pr_sha: ${{ github.event.pull_request.head.sha }}
+    sandbox_args: '--verbose --network-log-live --network-log /tmp/network.log'
+```
+
+**Available network debugging flags** (passed via `sandbox_args`):
+
+| Flag                  | Effect                                            |
+| --------------------- | ------------------------------------------------- |
+| `--network-log-live`  | Stream network activity to stderr during execution |
+| `--network-log FILE`  | Save network activity log to FILE                 |
+| `--verbose`           | Enable INFO-level sandbox logging                 |
+| `--debug`             | Enable DEBUG-level logging (implies `--verbose`)  |
+
+The default `sandbox_args` is `--verbose`. When you override it, include
+`--verbose` explicitly if you still want sandbox-level informational logs
+alongside the network log.
+
 ## Versioning
 
 | Ref        | Installs from             | Use case    |
