@@ -13,6 +13,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./
         with:
-          command: python3 tests/test_network.py
+          command: uv sync && uv run scripts/ci.py --verbose --timeout 0
           pr_sha: ${{ github.sha }}
           merge: false

@@ -24,19 +24,19 @@ external server. Sandbox Action prevents this by:
 >
 > 1. **Restrict workflow file modifications.** The token used to push branches
 >    must lack the `workflow` scope, or a repository ruleset must prevent
->    modifications to `.github/workflows/`. Otherwise, untrusted code can
->    push a workflow that runs outside the sandbox.
+>    modifications to `.github/workflows/`. Otherwise, untrusted code can push a
+>    workflow that runs outside the sandbox.
 >
-> 2. **Protect the base branch and restrict the workflow trigger.** The
->    workflow must trigger only on PRs targeting a protected branch (e.g.,
->    `branches: [main]`). Sandbox configuration is loaded from the base
->    branch; if the base branch is unprotected, a PR author could push
->    malicious configuration to it.
+> 1. **Protect the base branch and restrict the workflow trigger.** The workflow
+>    must trigger only on PRs targeting a protected branch (e.g.,
+>    `branches: [main]`). Sandbox configuration is loaded from the base branch;
+>    if the base branch is unprotected, a PR author could push malicious
+>    configuration to it.
 >
-> 3. **Do not add steps after this action.** After sandbox execution, the
->    workspace is tainted -- untrusted code had write access to `.git/` and
->    all files. Any subsequent step (git commands, artifact uploads, scripts)
->    risks executing attacker-controlled code outside the sandbox.
+> 1. **Do not add steps after this action.** After sandbox execution, the
+>    workspace is tainted -- untrusted code had write access to `.git/` and all
+>    files. Any subsequent step (git commands, artifact uploads, scripts) risks
+>    executing attacker-controlled code outside the sandbox.
 
 ```yaml
 # .github/workflows/ci.yml
@@ -59,10 +59,10 @@ jobs:
 ## What It Does
 
 1. Installs `uv`, Python, and `airut-sandbox` on the host
-2. Checks out the **base branch** (trusted sandbox configuration)
-3. Fetches the PR commit on the host (no GitHub credentials needed in sandbox)
-4. Restores cached container images (or builds and caches them on first run)
-5. Runs your command inside `airut-sandbox`: container isolation, network
+1. Checks out the **base branch** (trusted sandbox configuration)
+1. Fetches the PR commit on the host (no GitHub credentials needed in sandbox)
+1. Restores cached container images (or builds and caches them on first run)
+1. Runs your command inside `airut-sandbox`: container isolation, network
    allowlisting, and **masked credentials** (surrogate tokens that the proxy
    replaces with real values only on matching outbound requests)
 
@@ -72,16 +72,16 @@ The PR code runs **only inside the container**. Sandbox configuration
 
 ## Inputs
 
-| Input           | Required | Default        | Description                                                                |
-| --------------- | -------- | -------------- | -------------------------------------------------------------------------- |
-| `command`       | Yes      |                | CI command to run inside the sandbox (after PR checkout)                   |
-| `pr_sha`        | Yes      |                | PR commit SHA to check out and test                                        |
+| Input           | Required | Default        | Description                                                               |
+| --------------- | -------- | -------------- | ------------------------------------------------------------------------- |
+| `command`       | Yes      |                | CI command to run inside the sandbox (after PR checkout)                  |
+| `pr_sha`        | Yes      |                | PR commit SHA to check out and test                                       |
 | `merge`         | No       | `true`         | Merge PR into base branch before running (like GitHub's default behavior) |
 | `airut_version` | No       | from `VERSION` | Airut version (`0.15.0` for PyPI, `main` for GitHub HEAD)                 |
-| `sandbox_args`  | No       | `--verbose`    | Additional arguments for `airut-sandbox run`                               |
-| `cache`         | No       | `true`         | Enable image caching across CI runs                                        |
-| `cache-version` | No       | `""`           | Arbitrary string to force cache invalidation                               |
-| `cache-max-age` | No       | `168`          | Maximum image age (hours) before forced rebuild                            |
+| `sandbox_args`  | No       | `--verbose`    | Additional arguments for `airut-sandbox run`                              |
+| `cache`         | No       | `true`         | Enable image caching across CI runs                                       |
+| `cache-version` | No       | `""`           | Arbitrary string to force cache invalidation                              |
+| `cache-max-age` | No       | `168`          | Maximum image age (hours) before forced rebuild                           |
 
 When `merge` is `true` (the default), the container starts on the base branch
 and runs `git merge --no-edit <sha>` to create a temporary merge commit. This
@@ -95,8 +95,8 @@ Your repository needs:
 
 - `.airut/container/Dockerfile` -- container image (Python, uv, tools)
 - `.airut/sandbox.yaml` (optional) -- env vars, masked secrets, resource limits
-- `.airut/network-allowlist.yaml` (optional) -- required if `network_sandbox:
-  true`
+- `.airut/network-allowlist.yaml` (optional) -- required if
+  `network_sandbox: true`
 
 The network allowlist does **not** need to include your repository's GitHub URL.
 The action fetches the PR SHA on the host before entering the sandbox.
@@ -219,7 +219,7 @@ This requires two external controls that the action cannot enforce itself:
    `.github/workflows/`. Without this, the PR author can push a workflow that
    bypasses the sandbox entirely.
 
-2. **The base branch must be protected, and the workflow must only trigger on
+1. **The base branch must be protected, and the workflow must only trigger on
    PRs targeting protected branches.** If the workflow triggers on PRs to
    unprotected branches, the PR author can push malicious `.airut/` config to
    the base branch before the workflow runs.
@@ -285,8 +285,8 @@ To force cache invalidation (e.g., after urgent security patches), bump
 ## Debugging Network Issues
 
 When a sandboxed CI command fails due to blocked network requests, use the
-`sandbox_args` input to enable live network logging. This streams every
-DNS query, allowed request, and blocked request to the job log in real time:
+`sandbox_args` input to enable live network logging. This streams every DNS
+query, allowed request, and blocked request to the job log in real time:
 
 ```yaml
 - uses: airutorg/sandbox-action@v0
@@ -296,8 +296,8 @@ DNS query, allowed request, and blocked request to the job log in real time:
     sandbox_args: '--verbose --network-log-live'
 ```
 
-The `--network-log-live` flag prints each network event to stderr as it
-happens, prefixed with `[net]`:
+The `--network-log-live` flag prints each network event to stderr as it happens,
+prefixed with `[net]`:
 
 ```
 [net] DNS A pypi.org -> 10.199.1.100
@@ -318,12 +318,12 @@ a CI artifact) by adding `--network-log`:
 
 **Available network debugging flags** (passed via `sandbox_args`):
 
-| Flag                  | Effect                                            |
-| --------------------- | ------------------------------------------------- |
-| `--network-log-live`  | Stream network activity to stderr during execution |
-| `--network-log FILE`  | Save network activity log to FILE                 |
-| `--verbose`           | Enable INFO-level sandbox logging                 |
-| `--debug`             | Enable DEBUG-level logging (implies `--verbose`)  |
+| Flag                 | Effect                                             |
+| -------------------- | -------------------------------------------------- |
+| `--network-log-live` | Stream network activity to stderr during execution |
+| `--network-log FILE` | Save network activity log to FILE                  |
+| `--verbose`          | Enable INFO-level sandbox logging                  |
+| `--debug`            | Enable DEBUG-level logging (implies `--verbose`)   |
 
 The default `sandbox_args` is `--verbose`. When you override it, include
 `--verbose` explicitly if you still want sandbox-level informational logs
@@ -333,6 +333,6 @@ alongside the network log.
 
 | Ref        | Installs from             | Use case    |
 | ---------- | ------------------------- | ----------- |
-| `@v0`      | PyPI (latest 0.x.y)      | Stable      |
-| `@v0.15.0` | PyPI (`airut==0.15.0`)   | Pinned      |
+| `@v0`      | PyPI (latest 0.x.y)       | Stable      |
+| `@v0.15.0` | PyPI (`airut==0.15.0`)    | Pinned      |
 | `@main`    | GitHub (airut repo, HEAD) | Development |
