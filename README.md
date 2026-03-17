@@ -152,17 +152,30 @@ missing, `airut-sandbox` exits with code 125 (fail-closed).
 
 ### Credential Handling
 
-Credentials should use the most restrictive mechanism available:
+The credential mechanism is determined by what the target service supports:
 
-| Mechanism               | When to use                             | Protection                                 |
-| ----------------------- | --------------------------------------- | ------------------------------------------ |
-| **Signing credentials** | AWS services (SigV4/SigV4A)             | Strongest: real keys never enter container |
-| **Masked secrets**      | All other API tokens, passwords         | Strong: container sees only surrogates     |
-| **`pass_env`**          | Non-sensitive values (CI flags, locale) | None: real value visible inside container  |
+| Mechanism               | When to use                                        | How it works                                                         |
+| ----------------------- | -------------------------------------------------- | -------------------------------------------------------------------- |
+| **Signing credentials** | Services that use SigV4/SigV4A (AWS, R2, MinIO...) | Proxy re-signs requests; real keys stay in proxy, never forwarded    |
+| **Masked secrets**      | Token-based APIs (GitHub, Anthropic, etc.)         | Proxy substitutes real tokens into outbound requests to scoped hosts |
+| **`pass_env`**          | Non-sensitive values (CI flags, locale)            | Real value visible inside container                                  |
 
-**Masked secrets should be the default for all credentials.** Even if the
-network sandbox prevents most exfiltration, masked secrets ensure that a
-container escape or sandbox misconfiguration cannot expose real credentials.
+With both signing credentials and masked secrets, real credentials never enter
+the container — the container only sees surrogates (random placeholder strings
+that are not usable outside the sandbox). The difference is what happens at the
+proxy:
+
+- **Signing credentials**: Real keys never leave the proxy. The proxy uses them
+  to compute request signatures and forwards only the signature — the secret key
+  is never sent on the wire. Even the target host never sees the raw credential.
+- **Masked secrets**: The proxy substitutes the real token into the outbound
+  request toward the scoped host. The target host receives the real credential,
+  which means it could in theory reflect the value back (e.g., in error messages
+  or response bodies).
+
+The choice between the two is driven by what the target service supports. Use
+signing credentials for any service that accepts SigV4/SigV4A and masked secrets
+for token-based APIs.
 
 ### Network Allowlist
 
