@@ -1,0 +1,12 @@
+# Network allowlist for sandbox-action self-test.
+#
+# Only hosts listed here are reachable from inside the container.
+# All other traffic is blocked by the mitmproxy-based network proxy.
+
+domains: []
+
+url_prefixes:
+  # GitHub raw content — used by the self-test to verify allowed fetches.
+  - host: raw.githubusercontent.com
+    path: /airutorg/airut*
+    methods: [GET, HEAD]
