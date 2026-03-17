@@ -152,17 +152,19 @@ missing, `airut-sandbox` exits with code 125 (fail-closed).
 
 ### Credential Handling
 
-Credentials should use the most restrictive mechanism available:
+The credential mechanism is determined by what the target service supports:
 
-| Mechanism               | When to use                             | Protection                                 |
-| ----------------------- | --------------------------------------- | ------------------------------------------ |
-| **Signing credentials** | AWS services (SigV4/SigV4A)             | Strongest: real keys never enter container |
-| **Masked secrets**      | All other API tokens, passwords         | Strong: container sees only surrogates     |
-| **`pass_env`**          | Non-sensitive values (CI flags, locale) | None: real value visible inside container  |
+| Mechanism               | When to use                                | How it works                                                                |
+| ----------------------- | ------------------------------------------ | --------------------------------------------------------------------------- |
+| **Signing credentials** | AWS services that use SigV4/SigV4A         | Proxy re-signs requests; real keys never enter container                    |
+| **Masked secrets**      | Token-based APIs (GitHub, Anthropic, etc.) | Container sees surrogates; proxy swaps for real values on matching requests |
+| **`pass_env`**          | Non-sensitive values (CI flags, locale)    | Real value visible inside container                                         |
 
-**Masked secrets should be the default for all credentials.** Even if the
-network sandbox prevents most exfiltration, masked secrets ensure that a
-container escape or sandbox misconfiguration cannot expose real credentials.
+**Masked secrets should be the default for all credentials.** SigV4 signing
+credentials are only applicable to AWS services and cannot be used elsewhere.
+SigV4 has the additional property that real keys never leave the server
+configuration and proxy container, but the choice between the two mechanisms is
+driven by what the service supports, not by a security preference.
 
 ### Network Allowlist
 
