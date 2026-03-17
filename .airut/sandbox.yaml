@@ -1,0 +1,4 @@
+# Sandbox configuration for sandbox-action self-test.
+
+env:
+  CI: "true"

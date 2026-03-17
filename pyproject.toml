@@ -1,0 +1,61 @@
+[project]
+name = "sandbox-action"
+version = "0.0.0"
+description = "Reusable GitHub Action for sandboxed CI with Airut"
+requires-python = ">=3.13"
+
+[dependency-groups]
+dev = [
+    "mdformat>=1.0",
+    "mdformat-gfm>=1.0",
+    "mdformat-ruff>=0.1",
+    "pytest>=9.0",
+    "ruff>=0.15",
+    "ty>=0.0.17",
+]
+
+[tool.ruff]
+line-length = 80
+target-version = "py313"
+src = ["scripts", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # Pyflakes
+    "I",      # isort
+    "W",      # pycodestyle warnings
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "D",      # pydocstyle
+    "ANN401", # disallow typing.Any in annotations
+]
+ignore = [
+    "D1",     # Allow missing docstrings (enforce via review)
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[tool.ruff.lint.isort]
+force-single-line = false
+lines-after-imports = 2
+
+[tool.ty.environment]
+python-version = "3.14"
+
+[tool.ty.src]
+include = ["scripts", "tests"]
+
+[tool.ty.terminal]
+error-on-warning = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
