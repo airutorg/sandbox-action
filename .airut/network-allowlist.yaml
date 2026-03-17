@@ -6,6 +6,14 @@
 domains: []
 
 url_prefixes:
+  # Python packages — needed for uv sync inside sandbox.
+  - host: pypi.org
+    path: ""
+    methods: [GET, HEAD]
+  - host: files.pythonhosted.org
+    path: ""
+    methods: [GET, HEAD]
+
   # GitHub raw content — used by the self-test to verify allowed fetches.
   - host: raw.githubusercontent.com
     path: /airutorg/airut*
