@@ -13,7 +13,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./
         with:
-          command: >-
-            python3 -c "import sys; print(f'Python {sys.version}'); print('sandbox-action self-test passed')"
+          command: python3 tests/test_network.py
           pr_sha: ${{ github.sha }}
           merge: false

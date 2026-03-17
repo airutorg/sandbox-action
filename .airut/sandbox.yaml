@@ -1,10 +1,4 @@
 # Sandbox configuration for sandbox-action self-test.
-#
-# Minimal config — just enough to verify the action runs end-to-end.
-# Network sandbox is disabled for now; the test command doesn't need
-# network access and this avoids requiring a network allowlist.
 
 env:
   CI: "true"
-
-network_sandbox: false
