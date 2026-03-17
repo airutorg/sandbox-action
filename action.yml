@@ -27,6 +27,25 @@ inputs:
     description: 'Additional arguments for airut-sandbox run'
     required: false
     default: '--verbose'
+  cache:
+    description: >-
+      Enable image caching across CI runs. Set to "false" to disable
+      caching and force fresh image builds every run.
+    required: false
+    default: 'true'
+  cache-version:
+    description: >-
+      Arbitrary string appended to cache keys to force invalidation.
+      Change this value when automatic cache invalidation is insufficient
+      (e.g., to pick up new versions of dynamically-installed tools).
+    required: false
+    default: ''
+  cache-max-age:
+    description: >-
+      Maximum image age in hours before forced rebuild. Passed as
+      --max-image-age to airut-sandbox run. Default 168 (one week).
+    required: false
+    default: '168'
 
 runs:
   using: "composite"
@@ -78,6 +97,73 @@ runs:
         TARGET_SHA: ${{ inputs.pr_sha }}
       run: git fetch origin "$TARGET_SHA"
 
+    # --- Image caching (pre-sandbox, all steps on trusted host) ---
+    # Cache operations run BEFORE the sandbox so the workspace is still
+    # untainted. Uses split restore/save pattern to only upload on miss.
+
+    - name: Compute image hashes
+      id: image-hash
+      if: inputs.cache == 'true'
+      shell: bash
+      run: |
+        eval "$(airut-sandbox image hash --verbose)"
+        echo "repo=$repo" >> "$GITHUB_OUTPUT"
+        echo "proxy=$proxy" >> "$GITHUB_OUTPUT"
+
+    - name: Restore repo image cache
+      id: repo-cache
+      if: inputs.cache == 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: /tmp/airut-image-cache/repo.tar
+        key: >-
+          airut-repo-${{ steps.image-hash.outputs.repo }}${{ inputs.cache-version && format('-v{0}', inputs.cache-version) || '' }}
+
+    - name: Restore proxy image cache
+      id: proxy-cache
+      if: inputs.cache == 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: /tmp/airut-image-cache/proxy.tar
+        key: >-
+          airut-proxy-${{ steps.image-hash.outputs.proxy }}${{ inputs.cache-version && format('-v{0}', inputs.cache-version) || '' }}
+
+    - name: Load cached images
+      if: >-
+        inputs.cache == 'true' &&
+        (steps.repo-cache.outputs.cache-hit == 'true' ||
+         steps.proxy-cache.outputs.cache-hit == 'true')
+      shell: bash
+      run: airut-sandbox image load /tmp/airut-image-cache --verbose
+
+    - name: Build and save images
+      if: >-
+        inputs.cache == 'true' &&
+        (steps.repo-cache.outputs.cache-hit != 'true' ||
+         steps.proxy-cache.outputs.cache-hit != 'true')
+      shell: bash
+      run: airut-sandbox image save /tmp/airut-image-cache --verbose
+
+    - name: Upload repo image cache
+      if: >-
+        inputs.cache == 'true' &&
+        steps.repo-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: /tmp/airut-image-cache/repo.tar
+        key: >-
+          airut-repo-${{ steps.image-hash.outputs.repo }}${{ inputs.cache-version && format('-v{0}', inputs.cache-version) || '' }}
+
+    - name: Upload proxy image cache
+      if: >-
+        inputs.cache == 'true' &&
+        steps.proxy-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: /tmp/airut-image-cache/proxy.tar
+        key: >-
+          airut-proxy-${{ steps.image-hash.outputs.proxy }}${{ inputs.cache-version && format('-v{0}', inputs.cache-version) || '' }}
+
     # --- Run sandboxed command ---
     # The checkout/merge + command is passed inline. No files are written
     # to the workspace -- it must remain clean for worktree-clean checks.
@@ -93,13 +179,19 @@ runs:
         SANDBOX_COMMAND: ${{ inputs.command }}
         SANDBOX_ARGS: ${{ inputs.sandbox_args }}
         SANDBOX_MERGE: ${{ inputs.merge }}
+        SANDBOX_MAX_IMAGE_AGE: ${{ inputs.cache-max-age }}
+        SANDBOX_CACHE: ${{ inputs.cache }}
       run: |
         if [ "$SANDBOX_MERGE" = "true" ]; then
           GIT_CMD='git merge --no-edit "$1"'
         else
           GIT_CMD='git checkout "$1"'
         fi
+        EXTRA_ARGS=""
+        if [ "$SANDBOX_CACHE" = "true" ]; then
+          EXTRA_ARGS="--max-image-age $SANDBOX_MAX_IMAGE_AGE"
+        fi
         # shellcheck disable=SC2086
-        airut-sandbox run $SANDBOX_ARGS -- \
+        airut-sandbox run $SANDBOX_ARGS $EXTRA_ARGS -- \
           bash -c "$GIT_CMD"' && eval "$2"' \
           _ "$SANDBOX_PR_SHA" "$SANDBOX_COMMAND"
