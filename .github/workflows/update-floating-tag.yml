@@ -21,8 +21,6 @@ jobs:
           && startsWith(github.event.release.tag_name, 'v'))
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-tags: true
 
       - name: Update major version tag
         env:
@@ -30,5 +28,7 @@ jobs:
         run: |
           # Extract major version: v0.18.0 -> v0
           MAJOR="v$(echo "$TAG" | sed 's/^v//' | cut -d. -f1)"
+          # fetch-tags option is broken (actions/checkout#1471), fetch explicitly
+          git fetch origin tag "$TAG" --force
           git tag -f "$MAJOR" "$TAG"
           git push origin "refs/tags/$MAJOR" --force
