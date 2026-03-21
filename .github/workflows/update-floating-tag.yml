@@ -1,0 +1,26 @@
+name: Update floating tag
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  update-tag:
+    runs-on: ubuntu-latest
+    if: >-
+      !github.event.release.prerelease
+      && startsWith(github.event.release.tag_name, 'v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update major version tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          # Extract major version: v0.18.0 -> v0
+          MAJOR="v$(echo "$TAG" | sed 's/^v//' | cut -d. -f1)"
+          git tag -f "$MAJOR" "$TAG"
+          git push origin "refs/tags/$MAJOR" --force
