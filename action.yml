@@ -193,5 +193,5 @@ runs:
         fi
         # shellcheck disable=SC2086
         airut-sandbox run $SANDBOX_ARGS $EXTRA_ARGS -- \
-          bash -c "$GIT_CMD"' && eval "$2"' \
+          bash -c 'export PYTHONUNBUFFERED=1 && '"$GIT_CMD"' && eval "$2"' \
           _ "$SANDBOX_PR_SHA" "$SANDBOX_COMMAND"
