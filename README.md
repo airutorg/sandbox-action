@@ -1,21 +1,34 @@
 # Airut Sandbox Action
 
-GitHub Action that runs CI commands inside a sandboxed container with network
-restrictions and credential isolation. Designed for repositories where PRs may
-come from untrusted sources -- such as a coding agent like
+GitHub Action that runs CI commands inside a sandboxed container with credential
+masking and network restrictions. Designed for repositories where PRs may come
+from untrusted sources -- such as a coding agent like
 [Airut](https://github.com/airutorg/airut).
 
-Standard GitHub Actions runners give workflow steps full outbound network access
-and expose repository secrets as environment variables. This means a malicious
-PR that modifies test scripts or build steps can exfiltrate secrets to an
-external server. Sandbox Action prevents this by:
+GitHub Actions runners are ephemeral, but the secrets they handle are not.
+Repository secrets -- API keys, PATs, service tokens -- are injected as plain
+environment variables and remain valid long after the runner is destroyed. When
+CI auto-triggers on a PR, it executes code controlled by the PR author (test
+suites, build scripts, linters) on a runner with full outbound internet access
+and access to these long-lived secrets. A single compromised test file can read
+a credential and exfiltrate it to an external server.
 
-- **Restricting network access** to an allowlist of permitted hosts and paths
-- **Masking credentials** with surrogate values that the network proxy swaps for
-  real secrets only on matching outbound requests, so the code inside the
-  container never sees real credential values
-- **Isolating execution** in a container with `--cap-drop=ALL` and
-  `no-new-privileges`
+The runner's ephemerality protects against persistent host compromise but does
+nothing to protect the credentials it exposes. Sandbox Action closes this gap:
+
+- **Masking credentials** -- The container never sees real credential values.
+  Secrets are replaced with surrogate tokens; a network proxy swaps surrogates
+  for real values only on outbound requests to explicitly scoped hosts. Even
+  fully compromised code cannot extract usable credentials -- the surrogates are
+  meaningless outside the sandbox. The ability to act with credentials is bound
+  to the container's lifetime and the proxy's scope enforcement.
+- **Restricting network access** -- All outbound HTTP(S) traffic routes through
+  a proxy that enforces a domain/path allowlist. Requests to unlisted hosts are
+  blocked, eliminating the exfiltration channel even for non-masked values.
+- **Containing execution** -- CI commands run inside a Podman container, not
+  directly on the runner. The container enforces the network and credential
+  controls above and prevents the sandboxed code from tampering with the runner
+  environment.
 
 ## Quick Start
 
